@@ -1,0 +1,143 @@
+blueprint:
+  name: Electric blanket control timer
+  description: "Control electric blanked timer, which controls the blanket switch"
+  domain: automation
+
+  input:
+    # 'switch.shellypluspluguk_d48afc406814_switch_0'
+    shelly_switch:
+      name: The switch ontrolling the blanket
+      selector:
+        entity:
+          filter:
+            domain: switch
+    start_button:
+      name: The button to start and increment the blanket timer
+      selector:
+        entity:
+          filter:
+            domain: input_button
+    clear_button:
+      name: The button to stop the blanket timer
+      selector:
+        entity:
+          filter:
+            domain: input_button
+    blanket_timer:
+      name: The timer to control the blanket
+      selector:
+        entity:
+          filter:
+            domain: timer
+
+    timer_increment:
+      name: Timer increment step in seconds
+      default: 3600
+      selector:
+        number:
+          min: 10
+          max: 3600
+    timer_max_inc: 
+      name: Timer number of increments permitted
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 10
+
+mode: queued
+
+trigger:
+  - platform: state
+    entity_id: !input shelly_switch
+    to: 'on'
+    id: switch_to_on
+  - platform: state
+    entity_id: !input shelly_switch
+    to: 'off'
+    id: button_clear
+  - platform: state
+    entity_id: !input start_button
+    id: button_start
+  - platform: state
+    entity_id: !input clear_button
+    id: button_clear
+  - platform: event
+    id: timer_stop
+    event_type:
+      - timer.cancelled
+      - timer.finished
+    event_data:
+      entity_id: !input blanket_timer
+  - platform: event
+    id: timer_start
+    event_type:
+      - timer.started
+      - timer.restarted
+    event_data:
+      entity_id: !input blanket_timer
+
+variables:
+  shelly_switch: !input shelly_switch
+  start_button: !input start_button
+  clear_button: !input clear_button
+  blanket_timer: !input blanket_timer
+  timer_increment: !input timer_increment
+  timer_max_inc:  !input timer_max_inc
+
+action:
+  - variables:
+      timer_state: "{{ states(blanket_timer) }}"
+
+  - choose:
+      - conditions:
+            # Switch has turned on, but timer not running. Just put an hour on the timer.
+          - condition: trigger
+            id: switch_to_on
+          - condition: template
+            value_template: "{{ 'idle' in timer_state  }}"
+        sequence:
+          - service: timer.start
+            data:
+              duration: "{{ timer_increment }}"
+            target:
+              entity_id: "{{ blanket_timer }}"
+
+      - conditions:
+          - condition: trigger
+            id: button_start
+        sequence:
+          - variables:
+              new_duration: >-
+                {% set remaining = (state_attr(blanket_timer, 'finishes_at') | default(0, 1) | as_datetime - now()).total_seconds() %} 
+                {% set duration = iif( remaining > 0, remaining|int + timer_increment, timer_increment) %}
+                {{ min ([timer_max_inc * timer_increment, duration]) }}
+          - service: timer.start
+            data:
+              duration: "{{ new_duration }}"
+            target:
+              entity_id: "{{ blanket_timer }}"
+      - conditions:
+          - condition: trigger
+            id: button_clear
+        sequence:
+          - service: timer.cancel
+            target:
+              entity_id: "{{ blanket_timer }}"
+      - conditions:
+          - condition: trigger
+            id: timer_start
+        sequence:
+          - service: switch.turn_on
+            data: {}
+            target:
+              entity_id: "{{ shelly_switch }}"
+      - conditions:
+          - condition: trigger
+            id: timer_stop
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: "{{ shelly_switch }}"
+            data: {}
+
