@@ -4,8 +4,7 @@ blueprint:
   domain: automation
 
   input:
-    # 'switch.shellypluspluguk_d48afc406814_switch_0'
-    shelly_switch:
+    power:
       name: The switch ontrolling the blanket
       selector:
         entity:
@@ -30,7 +29,7 @@ blueprint:
           filter:
             domain: timer
 
-    timer_increment:
+    timer_inc:
       name: Timer increment step in seconds
       default: 3600
       selector:
@@ -38,7 +37,7 @@ blueprint:
           min: 10
           max: 3600
     timer_max_inc: 
-      name: Timer number of increments permitted
+      name: Maximum timer increments permitted
       default: 5
       selector:
         number:
@@ -49,11 +48,11 @@ mode: queued
 
 trigger:
   - platform: state
-    entity_id: !input shelly_switch
+    entity_id: !input power
     to: 'on'
     id: switch_to_on
   - platform: state
-    entity_id: !input shelly_switch
+    entity_id: !input power
     to: 'off'
     id: button_clear
   - platform: state
@@ -78,11 +77,11 @@ trigger:
       entity_id: !input blanket_timer
 
 variables:
-  shelly_switch: !input shelly_switch
+  power: !input power
   start_button: !input start_button
   clear_button: !input clear_button
   blanket_timer: !input blanket_timer
-  timer_increment: !input timer_increment
+  timer_inc: !input timer_inc
   timer_max_inc:  !input timer_max_inc
 
 action:
@@ -99,7 +98,7 @@ action:
         sequence:
           - service: timer.start
             data:
-              duration: "{{ timer_increment }}"
+              duration: "{{ timer_inc }}"
             target:
               entity_id: "{{ blanket_timer }}"
 
@@ -110,8 +109,8 @@ action:
           - variables:
               new_duration: >-
                 {% set remaining = (state_attr(blanket_timer, 'finishes_at') | default(0, 1) | as_datetime - now()).total_seconds() %} 
-                {% set duration = iif( remaining > 0, remaining|int + timer_increment, timer_increment) %}
-                {{ min ([timer_max_inc * timer_increment, duration]) }}
+                {% set duration = iif( remaining > 0, remaining|int + timer_inc, timer_inc) %}
+                {{ min ([timer_max_inc * timer_inc, duration]) }}
           - service: timer.start
             data:
               duration: "{{ new_duration }}"
@@ -131,13 +130,13 @@ action:
           - service: switch.turn_on
             data: {}
             target:
-              entity_id: "{{ shelly_switch }}"
+              entity_id: "{{ power }}"
       - conditions:
           - condition: trigger
             id: timer_stop
         sequence:
           - service: switch.turn_off
             target:
-              entity_id: "{{ shelly_switch }}"
+              entity_id: "{{ power }}"
             data: {}
 
