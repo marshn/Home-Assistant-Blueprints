@@ -1,29 +1,29 @@
 blueprint:
-  name: Electric blanket control timer
-  description: "Control electric blanked timer, which controls the blanket switch"
+  name: Timer to control a switch, powering things line lights or electric blankets etc
+  description: "Control a timer, which controls a power switch"
   domain: automation
 
   input:
     power:
-      name: The switch ontrolling the blanket
+      name: The switch ontrolling the power to the device
       selector:
         entity:
           filter:
             domain: switch
     start_button:
-      name: The button to start and increment the blanket timer
+      name: The button to start and increment the timer
       selector:
         entity:
           filter:
             domain: input_button
     clear_button:
-      name: The button to stop the blanket timer
+      name: The button to stop the timer
       selector:
         entity:
           filter:
             domain: input_button
-    blanket_timer:
-      name: The timer to control the blanket
+    timer:
+      name: The timer to control the power switch
       selector:
         entity:
           filter:
@@ -67,26 +67,26 @@ trigger:
       - timer.cancelled
       - timer.finished
     event_data:
-      entity_id: !input blanket_timer
+      entity_id: !input timer
   - platform: event
     id: timer_start
     event_type:
       - timer.started
       - timer.restarted
     event_data:
-      entity_id: !input blanket_timer
+      entity_id: !input timer
 
 variables:
   power: !input power
   start_button: !input start_button
   clear_button: !input clear_button
-  blanket_timer: !input blanket_timer
+  timer: !input timer
   timer_inc: !input timer_inc
   timer_max_inc:  !input timer_max_inc
 
 action:
   - variables:
-      timer_state: "{{ states(blanket_timer) }}"
+      timer_state: "{{ states(timer) }}"
 
   - choose:
       - conditions:
@@ -100,7 +100,7 @@ action:
             data:
               duration: "{{ timer_inc }}"
             target:
-              entity_id: "{{ blanket_timer }}"
+              entity_id: "{{ timer }}"
 
       - conditions:
           - condition: trigger
@@ -108,21 +108,21 @@ action:
         sequence:
           - variables:
               new_duration: >-
-                {% set remaining = (state_attr(blanket_timer, 'finishes_at') | default(0, 1) | as_datetime - now()).total_seconds() %} 
+                {% set remaining = (state_attr(timer, 'finishes_at') | default(0, 1) | as_datetime - now()).total_seconds() %} 
                 {% set duration = iif( remaining > 0, remaining|int + timer_inc, timer_inc) %}
                 {{ min ([timer_max_inc * timer_inc, duration]) }}
           - service: timer.start
             data:
               duration: "{{ new_duration }}"
             target:
-              entity_id: "{{ blanket_timer }}"
+              entity_id: "{{ timer }}"
       - conditions:
           - condition: trigger
             id: button_clear
         sequence:
           - service: timer.cancel
             target:
-              entity_id: "{{ blanket_timer }}"
+              entity_id: "{{ timer }}"
       - conditions:
           - condition: trigger
             id: timer_start
