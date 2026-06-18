@@ -1,6 +1,6 @@
 blueprint:
-  name: Timer to control a switch, powering things line lights or electric blankets etc
-  description: "Control a timer, which controls a power switch"
+  name: Power control timer
+  description: "Timer to control a switch, powering things like lights or electric blankets etc. Controlled by start and stop buttons."
   domain: automation
 
   input:
